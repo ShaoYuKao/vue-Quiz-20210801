@@ -1,72 +1,21 @@
 <template>
   <div id="app">
-    <p>
-      站點名稱搜尋: <input type="text" v-model="searchText">
-    </p>
+    <Search @onSearchText="searchTextChange" />
 
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>場站名稱</th>
-          <th>場站區域</th>
-          <th>
-            <div @click="setSort('sbi')">
-              目前可用車輛
-              <i 
-                v-if="currentSort === 'sbi'"
-                :class="{ 'fa-sort-asc': !isSortDesc, 'fa-sort-desc': isSortDesc }" 
-                class="fa" aria-hidden="true"></i>
-              <i v-else class="fa fa-sort" aria-hidden="true"></i>
-            </div>
-          </th>
-          <th>
-            <div @click="setSort('tot')">
-              總停車格
-              <i 
-                v-if="currentSort === 'tot'"
-                :class="{ 'fa-sort-asc': !isSortDesc, 'fa-sort-desc': isSortDesc }" 
-                class="fa" aria-hidden="true"></i>
-              <i v-else class="fa fa-sort" aria-hidden="true"></i>
-            </div>
-          </th>
-          <th>資料更新時間</th>
-        </tr>
-      </thead>
-      <tbody>
-      <tr v-for="s in slicedUbikeStops" :key="s.sno">
-        <td>{{ s.sno }}</td>
-        <td>{{ s.sna }}</td>
-        <td>{{ s.sarea }}</td>
-        <td>{{ s.sbi }}</td>
-        <td>{{ s.tot }}</td>
-        <td>{{ timeFormat(s.mday) }}</td>
-      </tr>
-      </tbody>
-    </table>
+    <UbikeTable 
+      :ubikeStops = "ubikeStops" 
+      :countOfPage = "count_of_page"
+      :searchText = "searchText"
+      :currentPage = "currentPage"
+      @updatePage = "updatePage"
+    />
 
     <!-- 頁籤 -->
-    <nav v-if="pagerEnd > 0">
-      <ul class="pagination">
-        <li @click.prevent="setPage(currentPage - 1)" class="page-item">
-          <a class="page-link" href>Previous</a>
-        </li>
-
-        <li
-          v-for="i in pagerEnd"
-          :class="{ active: i + pagerAddAmount === currentPage }"
-          :key="i"
-          @click.prevent="setPage(i + pagerAddAmount)"
-          class="page-item">
-          <a class="page-link" href>{{ i + pagerAddAmount }}</a>
-        </li>
-
-        <li @click.prevent="setPage(currentPage + 1)" class="page-item">
-          <a class="page-link" href>Next</a>
-        </li>
-      </ul>
-    </nav>
-
+    <Pagination 
+      :countOfPage = "count_of_page"
+      :currentPage = "currentPage"
+      @updatePage = "updatePage"
+    />
   </div>
 </template>
 
@@ -74,20 +23,25 @@
 // 引入 bootstrap.css
 import "bootstrap/dist/css/bootstrap.css";
 
+import Search from "./components/Search.vue";
+import UbikeTable from './components/UbikeTable.vue';
+import Pagination from './components/Pagination.vue';
 
 // 單頁顯示筆數
 const COUNT_OF_PAGE = 10;
-// 頁碼最大數量
-const PAGINATION_MAX = 10;
 
 export default {
+  components: {
+    Search,
+    UbikeTable,
+    Pagination
+  },
   data() {
     return {
-      currentSort: "sno",
-      isSortDesc: false,
+      count_of_page: COUNT_OF_PAGE,
       ubikeStops: [],
       searchText: "",
-      currentPage: 1
+      currentPage: 1,
     };
   },
   computed: {
@@ -95,77 +49,15 @@ export default {
       // 過濾搜尋
       return this.ubikeStops.length === 0
         ? []
-        : this.ubikeStops.filter(d => d.sna.includes(this.searchText));
+        : this.ubikeStops.filter((d) => d.sna.includes(this.searchText));
     },
-    sortedUbikeStops() {
-      // 拿過濾的結果做排序
-      const filtedStops = [...this.filtedUbikeStops];
-
-      return this.isSortDesc
-        ? filtedStops.sort((a, b) => b[this.currentSort] - a[this.currentSort])
-        : filtedStops.sort((a, b) => a[this.currentSort] - b[this.currentSort]);
-    },
-    slicedUbikeStops() {
-      // 將排序的結果做分頁切割
-      const start = (this.currentPage - 1) * COUNT_OF_PAGE;
-      const end =
-        start + COUNT_OF_PAGE <= this.sortedUbikeStops.length
-          ? start + COUNT_OF_PAGE
-          : this.sortedUbikeStops.length;
-
-      return this.sortedUbikeStops.slice(start, end);
-    },
-    totalPageCount() {
-      // 計算總頁數
-      return Math.ceil(this.filtedUbikeStops.length / COUNT_OF_PAGE);
-    },
-    pagerEnd() {
-      // 頁碼尾端
-      return this.totalPageCount <= PAGINATION_MAX
-        ? this.totalPageCount
-        : PAGINATION_MAX;
-    },
-    pagerAddAmount() {
-      // 頁碼位移
-      const tmp =
-        this.totalPageCount <= PAGINATION_MAX
-          ? 0
-          : this.currentPage + 4 - this.pagerEnd;
-
-      return tmp <= 0
-        ? 0
-        : this.totalPageCount - (PAGINATION_MAX + tmp) < 0
-        ? this.totalPageCount - PAGINATION_MAX
-        : tmp;
-    }
-  },
-  watch: {
-    sortedUbikeStops() {
-      // 當搜尋條件、排序變更時，強制切到第一頁
-      this.setPage(1);
-    }
   },
   methods: {
-    timeFormat(val) {
-      // 時間格式
-      const pattern = /(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/;
-      return val.replace(pattern, "$1/$2/$3 $4:$5:$6");
+    searchTextChange(snaText) {
+      this.searchText = snaText;
     },
-    setPage(page) {
-      // 設定目前頁數
-      if (page < 1 || page > this.totalPageCount) {
-        return;
-      }
+    updatePage(page) {
       this.currentPage = page;
-    },
-    setSort(sortType) {
-      // 切換排序
-      if (sortType === this.currentSort) {
-        this.isSortDesc = !this.isSortDesc;
-      } else {
-        this.currentSort = sortType;
-        this.isSortDesc = false;
-      }
     }
   },
   created() {
@@ -178,13 +70,13 @@ export default {
     // snaen：場站名稱(英文)、 aren：地址(英文)、 bemp：空位數量、 act：全站禁用狀態
 
     fetch("https://tcgbusfs.blob.core.windows.net/blobyoubike/YouBikeTP.gz")
-      .then(res => res.json())
-      .then(res => {
+      .then((res) => res.json())
+      .then((res) => {
         // 將 json 轉陣列後存入 this.ubikeStops
-        this.ubikeStops = Object.keys(res.retVal).map(key => res.retVal[key]);
+        this.ubikeStops = Object.keys(res.retVal).map((key) => res.retVal[key]);
       });
-  }
-}
+  },
+};
 </script>
 
 <style>
@@ -192,7 +84,7 @@ export default {
   padding: 0.5rem;
 }
 
-.fa-sort{
+.fa-sort {
   color: #aaa;
 }
 </style>
